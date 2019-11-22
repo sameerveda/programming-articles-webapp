@@ -1,0 +1,18 @@
+html, body {
+    background-color: whitesmoke;
+}
+
+h1 {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: monospace;
+    text-align: center;
+}
+
+h1:before,  h1:after {
+    content: '----';
+    display: block;
+    text-align: center;
+}

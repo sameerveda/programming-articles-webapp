@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories {
+    jcenter()
+}
+
+mainClassName = 'Main'
+installDist.destinationDir = file('target')
+
+dependencies {
+  implementation 'com.sparkjava:spark-core:2.8.0'
+  implementation 'com.j2html:j2html:1.4.0'
+}
+
+task install(dependsOn:[installDist]) {
+  doLast {
+     def libdir = file(new File(installDist.destinationDir, 'lib'))
+     def deps = libdir.list().collect{"target/lib/${it}"}.join(':')
+     file('Procfile').text = "web: java  \$JAVA_OPTS -Dheroku.port=\$PORT -Dheroku.host=\$HOST -cp \"$deps\" ${mainClassName} --cache-static";
+  } 
+}
+
+task stage(dependsOn: [clean, install])
+
