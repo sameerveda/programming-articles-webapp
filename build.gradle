@@ -13,15 +13,32 @@ installDist.destinationDir = file('target')
 dependencies {
   implementation 'com.sparkjava:spark-core:2.8.0'
   implementation 'com.j2html:j2html:1.4.0'
+  implementation 'commons-io:commons-io:2.6'
+  
+  implementation 'org.slf4j:slf4j-simple:2.0.0-alpha1'
+  implementation 'javax.persistence:persistence-api:1.0.2'
+  implementation 'com.carrotsearch:hppc:0.8.1'
+  implementation 'org.json:json:20180813'
+  implementation 'com.amazonaws:aws-java-sdk-dynamodb:1.11.681'
+  implementation 'org.fusesource.jdbm:jdbm:2.0.1'
+  implementation 'org.codejargon.feather:feather:1.0'
+  
+  implementation files('myutils.jar')
+  implementation fileTree('deps')
 }
 
 task install(dependsOn:[installDist]) {
   doLast {
      def libdir = file(new File(installDist.destinationDir, 'lib'))
      def deps = libdir.list().collect{"target/lib/${it}"}.join(':')
-     file('Procfile').text = "web: java  \$JAVA_OPTS -Dheroku.port=\$PORT -Dheroku.host=\$HOST -cp \"$deps\" ${mainClassName} --cache-static";
+     file('Procfile').text = "web: java  \$JAVA_OPTS -Dprogramming-articles-file=\"web-dev/programming-articles-dev/dist/index.html\" -Dheroku.port=\$PORT -Dheroku.host=\$HOST -cp \"$deps\" ${mainClassName}";
   } 
 }
 
-task stage(dependsOn: [clean, install])
+run {
+  environment['programming-articles-file'] = 'web-dev/programming-articles-dev/dist/index.html'
+  environment['programming-articles-cached'] = false
+  environment['dynamo-creds'] = 'dynamo-creds.properties'
+}
 
+task stage(dependsOn: [clean, install])

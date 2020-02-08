@@ -4,3 +4,8 @@
 bin/
 build/
 target/
+.gradle/
+ProgrammingArticlesRoute.LoadMetas2/
+**/node_modules/*
+cacheDir/
+dynamo-creds.properties

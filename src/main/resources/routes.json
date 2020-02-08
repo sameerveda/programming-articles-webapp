@@ -1,0 +1,14 @@
+[
+  {
+  "path": "/echo",
+  "type": "echo",
+  "example": "/echo?text=hello world",
+  "description": "text query, e.g. echo?text=hello world, will print 'hello world'"
+  },
+  {
+  "path": "/echo/:text",
+  "type": "echo",
+  "example": "/echo/hello world",
+  "description": "text query, e.g. echo/hello world, will print 'hello world'"
+  }
+]

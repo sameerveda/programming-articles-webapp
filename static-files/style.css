@@ -1,18 +1,17 @@
 html, body {
-    background-color: whitesmoke;
+    background-color: white;
+    font-family: Consolas, monospace;
 }
 
-h1 {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    font-family: monospace;
-    text-align: center;
+#routes-table th {
+	text-transform: capitalize;
+	text-align: left;
 }
 
-h1:before,  h1:after {
-    content: '----';
-    display: block;
-    text-align: center;
+#routes-table thead {
+	background-color: lightgray;
+}
+
+#routes-table tr th, #routes-table tr td  {
+	padding: 5px;
 }
