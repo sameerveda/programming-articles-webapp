@@ -333,7 +333,7 @@ class ContentPane {
         mount(container, this.tagsAdder);
       }
       utils.unhide(this.tagsAdder);
-      this.tagsAdder.update(this.loadedItem.title, this.loadedItem.tags);
+      this.tagsAdder.update(this.loadedItem.title, [...this.loadedItem.tags]);
       this.tagsAdder.onclose = items => {
         utils.hide(this.tagsAdder);
         utils.unhide(this);

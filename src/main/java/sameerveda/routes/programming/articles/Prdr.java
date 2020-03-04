@@ -31,8 +31,8 @@ public class Prdr extends DefaultProviders {
 	}
 
 	@Override
-	protected <E extends Comparable<?>, F> Map<E, F> cacheFor(String arg0) {
-		return new NoopMap<>();
+	protected <E extends Comparable<?>, F> Map<E, F> cacheFor(String s) {
+		return s.equals(CACHE_NAME_CONSTANT_DATAITEM) ? new NoopMap<>() : null;
 	}
 	
 
