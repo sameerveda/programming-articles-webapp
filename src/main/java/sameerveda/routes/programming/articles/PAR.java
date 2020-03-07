@@ -1,7 +1,7 @@
 package sameerveda.routes.programming.articles;
 
 import static sameerveda.routes.programming.articles.ProgrammingArticlesRoute.JSON_MIME;
-import static sameerveda.routes.programming.articles.ProgrammingArticlesRoute.PATH;
+import static sameerveda.routes.programming.articles.ProgrammingArticlesRoute.*;
 import static spark.Spark.get;
 import static spark.Spark.post;
 
@@ -14,10 +14,12 @@ public final class PAR implements RouteConfig {
 		@Override
 		public void configure(Injector injector) {
 			Route r = RouteConfig.lazyRoute(injector, ProgrammingArticlesRoute.class);
+			
+			String[] urls = {"/item", "/metas", "/tags", "/page"};
 
-			post(PATH.concat("/item_update"), JSON_MIME, r);
-			get(PATH.concat("/:type/:number"), JSON_MIME, r);
-			get(PATH.concat("/:type"), JSON_MIME, r);
+			post(DATA_PATH.concat(urls[0]), JSON_MIME, r);
+			for (String s : urls) 
+				get(DATA_PATH.concat(s), JSON_MIME, r);
 			get(PATH, r);
 		}
 

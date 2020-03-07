@@ -1,7 +1,5 @@
 package sameerveda.routes.programming.articles;
 
-import static java.lang.Integer.parseInt;
-import static java.lang.Short.parseShort;
 import static org.apache.http.HttpStatus.SC_ACCEPTED;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
@@ -12,12 +10,16 @@ import static spark.Spark.halt;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Timer;
@@ -28,6 +30,7 @@ import java.util.stream.IntStream;
 import javax.inject.Singleton;
 
 import org.apache.commons.io.output.StringBuilderWriter;
+import org.apache.http.HttpStatus;
 import org.eclipse.jetty.http.MimeTypes;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -40,12 +43,16 @@ import programming.articles.impl.DefaultDataItemPagination;
 import programming.articles.model.DataStatus;
 import programming.articles.model.Tag;
 import programming.articles.model.dynamo.DataItem;
+import sam.myutils.Checker;
 import sam.myutils.System2;
 import sam.nopkg.EnsureSingleton;
+import sam.reference.ReferenceUtils;
 import sameerveda.api.LoginSupport;
+import sameerveda.utils.Utils;
 import spark.Request;
 import spark.Response;
 import spark.Route;
+import spark.Session;
 
 @Singleton
 public class ProgrammingArticlesRoute implements Route, LoginSupport {
@@ -56,16 +63,24 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 
 	public static final String JSON_MIME = APPLICATION_JSON.asString();
 	public static final String PATH = "/programming-articles";
+	public static final String DATA_PATH = "/programming-articles/data";
+	private static final String PAGINATION = "pagination";
+	private final List<WeakReference<Session>> sessions = new ArrayList<>(); 
 
-	private volatile Prdr providers;
+	private volatile Prdr _providers;
 	private final AtomicLong lastAccess = new AtomicLong(System.currentTimeMillis());
 
-	private void init() throws Exception {
-		if (providers != null)
-			return;
+	private Prdr providers() {
+		if (_providers != null)
+			return _providers;
 
-		this.providers = new Prdr();
+		try {
+			this._providers = new Prdr();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 		startTimer();
+		return _providers;
 	}
 
 	private void startTimer() {
@@ -76,10 +91,19 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 			public void run() {
 				if (System.currentTimeMillis() - lastAccess.get() < interval)
 					return;
-				synchronized (ProgrammingArticlesRoute.class) {
+				synchronized (ProgrammingArticlesRoute.this) {
+					if (System.currentTimeMillis() - lastAccess.get() < interval)
+						return;
+					
+					sessions.forEach(w -> {
+						Session s = ReferenceUtils.get(w);
+						if(s != null)
+							s.removeAttribute(PAGINATION);
+					});
+					sessions.clear();
 					timer.cancel();
-					DefaultProviders p = providers;
-					providers = null;
+					DefaultProviders p = _providers;
+					_providers = null;
 
 					try {
 						p.close();
@@ -94,36 +118,72 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 
 	@Override
 	public Object handle(Request req, Response res) throws Exception {
-		lastAccess.set(System.currentTimeMillis());
-		String role = getRole(req);
-		if (role == null)
-			return login(req, res);
-
-		if (req.requestMethod().equalsIgnoreCase("POST")) {
-			JSONObject json = new JSONObject(req.body());
-			update(json);
-			return halt(SC_ACCEPTED);
-		}
-
-		String type = req.params(":type");
-		if (type == null)
+		System.out.println(req.uri());
+		System.out.println(req.url());
+		req.queryMap().toMap().forEach((s,t) -> System.out.println(s+"="+Arrays.toString(t)));
+		
+		if (!req.uri().startsWith(DATA_PATH))
 			return index();
 
-		String numS = req.params(":number");
-
-		if (numS == null) {
-			switch (type.toLowerCase()) {
-				case "metas":
-					return metas(res);
-				case "tags":
-					return tags(res);
+		res.type(JSON_MIME);
+		synchronized (this) {
+			switch (req.uri().substring(DATA_PATH.length() + 1)) {
+				case "item":  return item(req, res);
+				case "metas": return metas(res);
+				case "tags":  return tags(res);
+				case "page":  return page(req, res);
+				default:
+					return halt(SC_BAD_REQUEST, "unknown type: " + req.uri());
 			}
 		}
+	}
 
-		if (type != null && numS == null)
-			return halt(SC_BAD_REQUEST, "number not defined");
+	private Object item(Request req, Response res) throws Exception {
+		if (req.requestMethod().equalsIgnoreCase("POST")) {
+			JSONObject json = new JSONObject(req.body());
+			short id = toShort((int) json.remove(ID));
+			if (json.isEmpty())
+				halt(HttpStatus.SC_BAD_REQUEST, "no update specified");
 
-		return create(req, res, type, numS);
+			Map<String, String> updates = new HashMap<>();
+			StateManager sm = providers().stateManager();
+
+			json.keySet().forEach(s -> {
+				if (s.equals(TAGS)) {
+					JSONArray arry = json.getJSONArray(s);
+					String tags;
+					if (arry == null || arry.length() == 0) {
+						tags = "";
+					} else {
+						tags = Tag.serialize(
+								IntStream.range(0, arry.length())
+								.map(n -> sm.getTagByName(arry.getString(n)).getId())
+								.distinct()
+								);
+					}
+					updates.put(TAGS, tags);
+					sm.commitNewTags();
+				} else {
+					updates.put(s, json.getString(s));
+				}
+			});
+			sm.commit((short) id, updates);
+			return halt(SC_ACCEPTED);
+		} else {
+			String idS = req.queryParams("itemId");
+			if (Checker.isEmptyTrimmed(idS))
+				return halt(HttpStatus.SC_BAD_REQUEST, "itemId not specified");
+			short id = toShort(Integer.parseInt(idS));
+			DataItem d = providers().stateManager().getItem(id);
+			return d == null ? halt(HttpStatus.SC_NOT_FOUND, "item not found with id: " + id)
+					: Utils.jsonWritable(w -> Result.serialize(d, w, providers().stateManager()));
+		}
+	}
+
+	private short toShort(int n) {
+		if (n > Short.MAX_VALUE)
+			halt(SC_BAD_REQUEST, "value value higher than: " + Short.MAX_VALUE);
+		return (short) n;
 	}
 
 	private JsonWritable metas(Response res) {
@@ -168,87 +228,42 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 		return page;
 	}
 
-	private synchronized Object update(JSONObject json) throws Exception {
-		int id = (int) json.remove(ID);
-		if (id > Short.MAX_VALUE)
-			return halt(SC_BAD_REQUEST, "id value higher than: " + Short.MAX_VALUE);
-		if (json.isEmpty())
-			return null;
-
-		Map<String, String> updates = new HashMap<>();
-		init();
-		StateManager sm = providers.stateManager();
-
-		try {
-			json.keySet().forEach(s -> {
-				if (s.equals(TAGS)) {
-					JSONArray arry = json.getJSONArray(s);
-					String tags = arry.isEmpty() ? ""
-							: Tag.serialize(IntStream.range(0, arry.length())
-									.map(n -> sm.getTagByName(arry.getString(n)).getId()));
-					updates.put(TAGS, tags);
-					sm.commitNewTags();
-				} else {
-					updates.put(s, json.getString(s));
-				}
-			});
-		} catch (Exception e) {
-			e.printStackTrace();
-			return null;
-		}
-		return sm.commit((short) id, updates);
-	}
-
-	private synchronized Object create(Request req, Response res, String type, String numS)
-			throws NumberFormatException, Exception {
-		res.type(JSON_MIME);
-		switch (type.toLowerCase()) {
-			case "page":
-				return page(req, res, parseInt(numS));
-			case "item":
-				return item(parseShort(numS));
-			default:
-				return halt(SC_BAD_REQUEST, "unknown type: " + type);
-		}
-	}
-
 	private Renderable tags(Response res) throws Exception {
-		init();
 		res.type(MimeTypes.Type.TEXT_PLAIN.asString());
 		return (sb, model) -> {
-			for (Tag t : providers.stateManager().allTagsNames())
+			for (Tag t : providers().stateManager().allTagsNames())
 				sb.append(t.getName()).append('\n');
 		};
 	}
 
-	private JsonWritable item(short id) throws Exception {
-		init();
-		DataItem d = providers.stateManager().getItem(id);
-		return w -> Result.serialize(d, w, providers.stateManager());
-	}
-
-	private Object page(Request req, Response res, int page) throws Exception {
-		init();
+	private Object page(Request req, Response res) throws Exception {
 		Result result = new Result();
-		result.pageSize = parseInt(req.queryParamOrDefault("page_size", "25"));
-		result.page = page;
+		result.pageSize = getInt(req, "pageSize", 25);
+		result.startingId = getInt(req, "startingId", -1);
+		result.page = getInt(req, "page", 0);
 		String s = req.queryParamOrDefault("status", "UNREAD").toUpperCase();
 		result.status = s.trim().equalsIgnoreCase("all") ? null : DataStatus.parse(s);
 
-		DefaultDataItemPagination pagination = req.session(true).attribute("pagination");
+		DefaultDataItemPagination pagination = ReferenceUtils.get(req.session(true).attribute(PAGINATION));
 		if (pagination == null) {
-			pagination = new DefaultDataItemPagination(providers.stateManager());
-			req.session().attribute("pagination", pagination);
+			pagination = new DefaultDataItemPagination(providers().stateManager());
+			Session ses = req.session();
+			ses.attribute(PAGINATION, new WeakReference<>(pagination));
+			sessions.add(new WeakReference<>(ses));
 		}
 
 		pagination.setPageSize(result.pageSize);
 		pagination.setPage(result.page);
+		pagination.setStartingId((short) result.startingId);
 		pagination.setStatus(result.status);
 
 		result.data = pagination.getData();
-		res.type(JSON_MIME);
-
 		return result;
+	}
+
+	private int getInt(Request req, String key, int defaultValue) {
+		String s = req.queryParams(key);
+		return s == null ? defaultValue : Integer.parseInt(s);
 	}
 
 	@Override

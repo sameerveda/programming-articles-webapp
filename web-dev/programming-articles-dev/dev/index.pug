@@ -11,10 +11,12 @@ html
  style
    include ../dist/styles.css
  body
+   = production_mode
    <div id="loading_indicator"><span></span></div>
    <div id="container"></div>
    script
-     include ../dist/index-min.js
-
-   
-   
+     if production_mode
+       include ../dist/index.js
+     else 
+       include ../dist/index-min.js
+       

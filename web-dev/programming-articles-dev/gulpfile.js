@@ -16,15 +16,15 @@ function load(name, values) {
 }
 
 function html() {
-  if(isProd) {
-    throw new Error('this task is not for production');
-  }
   return gulp
     .src("./dev/index.pug")
     .pipe(plumberFunc)
     .pipe(
       load("gulp-pug", {
-        doctype: "html"
+        doctype: "html",
+        data: {
+          production_mode: isProd
+        }
       })
     )
     .pipe(plumber.stop())

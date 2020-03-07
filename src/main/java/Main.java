@@ -33,6 +33,8 @@ import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 
 import org.apache.http.HttpStatus;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpHeaderValue;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -133,6 +135,9 @@ public class Main {
 			String normalize = Utils.normalizeUrl(s);
 			if (s != normalize)
 				res.redirect(normalize, HttpStatus.SC_MOVED_PERMANENTLY);
+			else {
+				res.header(HttpHeader.CONTENT_ENCODING.asString(), HttpHeaderValue.GZIP.asString());
+			}
 		});
 
 		LoginRoute.configure(injector);

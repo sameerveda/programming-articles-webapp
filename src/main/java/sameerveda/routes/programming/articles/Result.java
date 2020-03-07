@@ -23,13 +23,15 @@ import programming.articles.model.dynamo.DataItem;
 import sam.myutils.Checker;
 
 class Result implements JsonWritable {
-	public int page;
+	public int page = -1, startingId = -1;
 	public int pageSize;
 	public DataStatus status;
 	public List<ConstantDataItem> data;
 
 	@Override
 	public void write(JSONWriter w) {
+		if(startingId >= 0) 
+			w.key("startingId").value(startingId);
 		w.key("page").value(page)
 		.key("pageSize").value(pageSize)
 		.key("status").value(status)
