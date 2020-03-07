@@ -17,7 +17,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,9 +117,10 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 
 	@Override
 	public Object handle(Request req, Response res) throws Exception {
-		System.out.println(req.uri());
-		System.out.println(req.url());
-		req.queryMap().toMap().forEach((s,t) -> System.out.println(s+"="+Arrays.toString(t)));
+		lastAccess.set(System.currentTimeMillis());
+		String role = getRole(req);
+		if (role == null)
+			return login(req, res);
 		
 		if (!req.uri().startsWith(DATA_PATH))
 			return index();

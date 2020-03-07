@@ -48,7 +48,7 @@ const utils = {
   },
   nearestParent(child, tagName) {
     while (true) {
-      if (child.tagName === tagName) {
+      if (!child || child.tagName === tagName) {
         return child;
       }
       child = child.parentElement;
@@ -123,7 +123,7 @@ async metas() {
       throw new Error("index not found: " + index);
     }
     if(index == this.page.data.length) {
-      await stateManger.loadPage(0, undefined, undefined, this.page.data[index - 1]);
+      await stateManger.loadPage(0, undefined, undefined, this.page.data[index - 1].id);
       if(stateManger.page.data.length === 0) {
         return null;
       }
@@ -131,7 +131,6 @@ async metas() {
     }
     stateManger.item = await stateManger.loadItem(this.page.data[index].id);
     stateManger.dataIndex = index;
-    console.log(stateManger.index);
     return stateManger.item;
   },
   async loadItem(itemId) {
@@ -187,7 +186,7 @@ class ItemList {
     ]);
     this.dataItemList.el.onclick = e => {
       const target = utils.nearestParent(e.target, "LI");
-      if (target.dataset.itemid) {
+      if (target && target.dataset.itemid) {
         history.pushState({},target.innerText,BASE_PATH.concat("?item=" + target.dataset.itemid));
         // see: https://felix-kling.de/blog/2011/how-to-detect-history-pushstate.html
         if (typeof history.onpushstate == "function") {  
@@ -197,10 +196,15 @@ class ItemList {
     };
   }
   update(data) {
-    this.dataItemList.update(data.filter(item => {
+    const filter = item => {
       const s = stateManger.statusMap.get(item.id);
       return !s || stateManger.page.status === s; 
-    }));
+    };
+    if(data.some(item => !filter(item))) {
+      data = data.filter(filter);
+    }
+
+    this.dataItemList.update(data);
     utils.disable(this.prev_btn, stateManger.pageNum === 0);
     this.updateCount();
   }
@@ -338,6 +342,7 @@ class ChangeDetector {
 class ContentPane {
   constructor() {
     this.favicon = el("img.icon");
+    this.id_info = el("span.id_info");
     this.title = el("h1.title");
     const trs = [];
     this.source = this.tr(trs, "Source", el("a", { target: "_blank" }));
@@ -353,7 +358,7 @@ class ContentPane {
     mount(this.tags, el("span.added_tags_wrap", [this.tagsList, this.addTagBtn]) );
 
     this.el = el("#content.visible", [
-      this.favicon,
+      el('.top', [this.favicon, this.id_info]),
       this.title,
       el("table", [el("tbody", trs)]),
       el(".bottom", [this.next, this.save])
@@ -365,8 +370,8 @@ class ContentPane {
     this.addTagBtn.onclick = () => this.onaddTag();
     this.save.onclick = () => this.onsave();
     this.next.onclick = () => stateManger.loadItemByIndex(stateManger.dataIndex + 1).then(item => {
-      console.log(stateManger.dataIndex);
-      update(item);
+      this.update(item);
+      history.replaceState({},item.title,BASE_PATH.concat("?item=" + item.id));
     });
   }
 
@@ -385,7 +390,7 @@ class ContentPane {
       utils.disable(this.save, true);
     } else {
       update.id = this.loadedItem.id;
-      httpPost(BASE_DATA_PATH.concat("item"), update)
+      http.POST(BASE_DATA_PATH.concat("item"), update)
         .then(res => {
           if (res.status >= 200 && res.status < 300) {
             this.changes.clear();
@@ -448,6 +453,7 @@ class ContentPane {
     utils.setText(this.notes, json.notes);
     this.status.value = json.status;
     this.tagsList.set([...json.tags]);
+    this.id_info.innerText = `${stateManger.dataIndex || ''} / ${json.id}`;
   }
 }
 
