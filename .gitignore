@@ -6,3 +6,5 @@ ProgrammingArticlesRoute.LoadMetas2/
 **/node_modules/*
 cacheDir/
 dynamo-creds.properties
+web-dev/programming-articles-dev/dist/*
+!web-dev/programming-articles-dev/dist/index.html

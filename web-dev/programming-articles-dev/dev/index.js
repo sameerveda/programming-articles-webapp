@@ -116,7 +116,9 @@ async metas() {
       throw new Error("no query make");
     }
     const res = await http.GET(BASE_DATA_PATH.concat("page?").concat(query));
-    return stateManger.page = Object.freeze(await res.json());
+    stateManger.page = Object.freeze(await res.json());
+    stateManger.pageNum = params.page;
+    return stateManger.page;
   },
   async loadItemByIndex(index) {
     if (!this.page || index > this.page.data.length || index < 0) {
