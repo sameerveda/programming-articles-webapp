@@ -151,6 +151,7 @@ async metas() {
       if(stateManger.dataIndex <  0)
       stateManger.dataIndex = 0;
     }
+    item.tags = item.tags_parsed;
     return stateManger.item = item;
   },
   async tags() {
