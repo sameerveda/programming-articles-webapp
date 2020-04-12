@@ -3,8 +3,7 @@ package sameerveda.routes.programming.articles;
 import static org.apache.http.HttpStatus.SC_ACCEPTED;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
-import static programming.articles.model.dynamo.ConstantDataItem.ID;
-import static programming.articles.model.dynamo.DataItem.TAGS;
+import static programming.articles.model.DataItemMeta.TAGS;
 import static sameerveda.utils.Utils.appendJsonArray;
 import static spark.Spark.halt;
 
@@ -39,9 +38,10 @@ import programming.articles.api.JsonWritable;
 import programming.articles.api.StateManager;
 import programming.articles.app.providers.DefaultProviders;
 import programming.articles.impl.DefaultDataItemPagination;
+import programming.articles.model.DataItem;
+import programming.articles.model.DataItemMeta;
 import programming.articles.model.DataStatus;
 import programming.articles.model.Tag;
-import programming.articles.model.dynamo.DataItem;
 import sam.myutils.Checker;
 import sam.myutils.System2;
 import sam.nopkg.EnsureSingleton;
@@ -141,7 +141,7 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 	private Object item(Request req, Response res) throws Exception {
 		if (req.requestMethod().equalsIgnoreCase("POST")) {
 			JSONObject json = new JSONObject(req.body());
-			short id = toShort((int) json.remove(ID));
+			short id = toShort((int) json.remove(DataItemMeta.ID));
 			if (json.isEmpty())
 				halt(HttpStatus.SC_BAD_REQUEST, "no update specified");
 
@@ -257,6 +257,7 @@ public class ProgrammingArticlesRoute implements Route, LoginSupport {
 		pagination.setStartingId((short) result.startingId);
 		pagination.setStatus(result.status);
 
+		result.manager = providers().stateManager();
 		result.data = pagination.getData();
 		return result;
 	}

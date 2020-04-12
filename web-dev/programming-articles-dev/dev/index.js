@@ -98,6 +98,7 @@ const http = {
 
 const stateManger = {
   statusMap: new Map(),
+  touched: new Set(),
 async metas() {
   return stateManger.metas = (await (await http.GET(BASE_DATA_PATH.concat("metas"))).json());
 },
@@ -131,7 +132,14 @@ async metas() {
       }
       index = 0;
     }
-    stateManger.item = await stateManger.loadItem(this.page.data[index].id);
+    const item = this.page.data[index];
+    if(!stateManger.touched.has(item.id)) {
+      stateManger.touched.add(item.id);
+      item.tags = item.tags_parsed;
+      stateManger.item = item;
+    } else {
+      stateManger.item = await stateManger.loadItem(item.id);
+    }
     stateManger.dataIndex = index;
     return stateManger.item;
   },
